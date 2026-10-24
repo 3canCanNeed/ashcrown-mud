@@ -1,5 +1,5 @@
 ﻿/* ═══════════════════════════════════════════════════════════
-   灰烬王冠 · 界面层
+   十三响 · 界面层
    把引擎事件渲染成 CRT 终端上的字；把按键翻译成命令。
    ═══════════════════════════════════════════════════════════ */
 (function () {
@@ -169,7 +169,7 @@
     if (!S.visited.gate) q.push(['active', '过河，去霍洛城']);
     else if (!S.clues.keeper) q.push(['active', '小堂里的老修士']);
     else if (!S.flags.bossDead) q.push(['active', '查清那一夜的事']);
-    if (S.flags.bossDead) q.push(['active', '灰烬之心在你手上']);
+    if (S.flags.bossDead) q.push(['active', '第十三响在你手上']);
     if (S.clues.boatman) q.push(['done', '老科尔不肯渡的河']);
     if (S.clues.stele) q.push(['done', '城门上敲掉的冠']);
     if (S.clues.mural) q.push(['done', '壁画上凿掉的脸']);
