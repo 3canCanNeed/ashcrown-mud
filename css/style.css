@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
    灰烬王冠 · 拾灰人纪事
    视觉：CRT 磷光终端 · 三色火（余烬 / 钢青 / 血锈）
    ═══════════════════════════════════════════════════════════ */
@@ -275,6 +275,17 @@ kbd, .kw{
 .line.ascii{
   white-space:pre; font-size:13px; line-height:1.62; color:var(--fg);
   font-family:"Sarasa Mono SC","NSimSun","MS Gothic","Noto Sans Mono CJK SC",monospace;
+}
+
+/* 钟声：一夜将尽的提示 */
+.line.chime{
+  margin:1.05em 0; text-align:center;
+  font-size:12.5px; letter-spacing:.28em; text-indent:.28em;
+  color:#c9a24e;
+  text-shadow:0 0 18px rgba(201,162,78,.26);
+}
+.line.chime::before, .line.chime::after{
+  content:"·"; margin:0 .9em; color:var(--faint); letter-spacing:0;
 }
 
 /* 两列表格（帮助 / 交易） */

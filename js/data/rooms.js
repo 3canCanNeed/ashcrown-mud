@@ -228,7 +228,7 @@ DATA.rooms = {
       '墙上钉着铁环，环上挂过火把——现在只剩一圈黑。',
       '台阶尽头立着个人，背对着你，一动不动。',
     ],
-    exits: { south: 'birch', west: 'reliquary' },
+    exits: { south: 'birch', north: 'reliquary' },
     mobs: ['warden'],
     scenery: {
       '铁环': '环上有手印，十个手指的位置都磨亮了。像有人在这儿挂了很久。',
@@ -237,13 +237,13 @@ DATA.rooms = {
   },
 
   reliquary: {
-    id: 'reliquary', name: '圣器厅', tag: '厅', pos: [3, 1], act: 'act3', needsLight: true,
+    id: 'reliquary', name: '圣器厅', tag: '厅', pos: [4, 1], act: 'act3', needsLight: true,
     desc: [
       '大厅很高，柱子一直顶上去，看不见顶。',
       '墙上有壁画，画的是加冕——冠冕、权杖、跪着的人。可画到一半，脸被人凿掉了。',
       '地上散着许多东西：铁甲、剑、一半的盾。它们摆成一个圈，圈中间是空的。',
     ],
-    exits: { east: 'crypt', north: 'choir' },
+    exits: { south: 'crypt', east: 'choir' },
     mobs: ['skeleton_knight'],
     items: ['sword_holy'],
     scenery: {
@@ -254,13 +254,13 @@ DATA.rooms = {
   },
 
   choir: {
-    id: 'choir', name: '唱诗席', tag: '席', pos: [4, 1], act: 'act3', needsLight: true,
+    id: 'choir', name: '唱诗席', tag: '席', pos: [5, 1], act: 'act3', needsLight: true,
     desc: [
       '一长排一长排的木椅，全朝着同一个方向。',
       '椅背上挂着乐谱，风一吹，纸响。你听了一会儿，发现那不是纸响，那是有人在哼。',
       '最前面立着一架断了的管风琴，管子被人拆走了大半。',
     ],
-    exits: { south: 'reliquary', north: 'bellshaft' },
+    exits: { west: 'reliquary', north: 'bellshaft' },
     mobs: ['chorister'],
     scenery: {
       '乐谱': '谱子上的音符是反的，从最后一页唱到第一页。',
@@ -270,7 +270,7 @@ DATA.rooms = {
   },
 
   bellshaft: {
-    id: 'bellshaft', name: '钟井', tag: '井', pos: [5, 1], act: 'act3', needsLight: true,
+    id: 'bellshaft', name: '钟井', tag: '井', pos: [5, 0], act: 'act3', needsLight: true,
     desc: [
       '钟楼的中空是圆的。你站在底下往上望，看不见钟，只看见一圈一圈的梁，一直排到黑里去。',
       '脚下的地板有个洞，洞口往下有台阶。风从下面上来，是热的。',
@@ -286,7 +286,7 @@ DATA.rooms = {
   },
 
   blood: {
-    id: 'blood', name: '钟底大厅', tag: '底', pos: [5, 2], act: 'act4', needsLight: true,
+    id: 'blood', name: '钟底大厅', tag: '底', pos: [5, -1], act: 'act4', needsLight: true,
     desc: [
       '底下是一间圆厅。厅中间是一口池子，水很浅，亮得像灯。',
       '池边坐着一个人，背对着台阶，正在梳头。她梳得很慢，一梳到底，再梳一遍。',
