@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════
    灰烬王冠 · 界面层
    把引擎事件渲染成 CRT 终端上的字；把按键翻译成命令。
    ═══════════════════════════════════════════════════════════ */
@@ -141,7 +141,8 @@
 
     const r = window.DATA.rooms[S.room];
     $('#chipRoom').textContent = r ? r.name : '——';
-    $('#chipChime').textContent = Game.CHIMES[S.chime];
+    $('#chipChime').textContent = (Game.clockText ? Game.clockText() : '') +
+      '　第' + (S.night || 1) + '夜';
   }
 
   function renderBag(S) {
@@ -278,7 +279,7 @@
     v.innerHTML =
       '<div class="veil-inner">' +
         '<h2>' + esc(e.title) + '</h2>' +
-        '<p class="veil-sub">灰烬王冠 · 拾灰人纪事 · 卷一　终</p>' +
+        '<p class="veil-sub">十三响 · 霍洛城的一小时　终</p>' +
         '<div class="veil-body">' + body + '</div>' +
         '<p class="veil-quote">' + esc(e.epilogue) + '</p>' +
         '<p class="veil-stats">行者：' + esc(S.name) +

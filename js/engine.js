@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════
    灰烬王冠 · 引擎
    命令解析 / 移动 / 战斗 / 背包 / 剧情 / 结局
    引擎不触碰 DOM：产出 {t, m} 事件序列，交给 UI 渲染。
@@ -67,6 +67,8 @@ window.Game = (function () {
       cleared: {},
       mobState: {},
       chime: 11,
+      night: 1,
+      clock: 22 * 60,
       kills: 0,
       combat: null,
       buff: null,
@@ -106,9 +108,69 @@ window.Game = (function () {
     return true;
   }
 
+  const NIGHT_START = 22 * 60;
+  const NIGHT_END = 24 * 60;
+
+  function clockText() {
+    const m = ((S.clock == null ? NIGHT_START : S.clock) | 0);
+    const h = Math.floor(m / 60) % 24;
+    const mm = m % 60;
+    return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
+  }
+
   function tick(n) {
-    S.chime = (S.chime + (n || 1)) % 12;
-    S.steps += (n || 1);
+    n = n || 1;
+    S.chime = (S.chime + n) % 12;
+    S.steps += n;
+    if (S.clock == null) S.clock = NIGHT_START;
+    S.clock += n;
+    if (S.clock >= NIGHT_END) endNight('time');
+  }
+
+  /* 一夜结束：钟响，这一小时从头再来 */
+  function endNight(reason) {
+    if (S.ended) return;
+    S.combat = null;
+    S.buff = null;
+    S.dot = null;
+    emit('divider', '· · · · · · · · · ·');
+
+    if (reason === 'death') {
+      emit('bad', '你眼前一黑。');
+      emit('desc', '倒下的时候你听见钟声。很远，很慢，像有人在楼上数手指。');
+    } else if (reason === 'rest') {
+      emit('desc', '你在这条街上坐下来，闭上眼。');
+    } else {
+      emit('desc', '街上所有的声音一齐停了。');
+      emit('chime', '钟楼敲了十二下。');
+      emit('desc', '第十二下之后没有第十三下。有的只是——');
+      emit('desc', '你又一次站在灰门口。');
+    }
+
+    S.night += 1;
+    S.clock = NIGHT_START;
+    S.room = D.start;
+    S.hp = S.hpMax;
+    S.mp = S.mpMax;
+    S.cleared = {};
+    S.clearedAt = {};
+    S.mobState = {};
+    S.buff = null;
+    S.dot = null;
+    S.chime = 11;
+    S.finale = false;
+
+    emit('divider', '· · · 第 ' + cnNum(S.night) + ' 夜 · · ·');
+    emit('hint', '（城里的人都还在原处。你记得的路，也还在。）');
+    enterRoom(D.start, true);
+  }
+
+  function cnNum(n) {
+    const cn = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+    if (n <= 10) return cn[n];
+    if (n < 20) return '十' + cn[n - 10];
+    if (n < 100) return cn[Math.floor(n / 10)] + '十' + (n % 10 ? cn[n % 10] : '');
+    return String(n);
   }
 
   /* ─────────────── 房间 ─────────────── */
@@ -170,12 +232,12 @@ window.Game = (function () {
     if (!silent) tick(1);
 
     const r0 = D.rooms[id];
-    // 卷目：进入新的一卷时，先合上书页
-    if (r0 && r0.act && r0.act !== S.act && !(S.flags && S.flags['ch_' + r0.act])) {
-      S.act = r0.act;
-      S.flags['ch_' + r0.act] = true;
+    // 章节：不是靠走得远，是靠你熬过的夜够多
+    if (r0 && r0.act && !(S.flags && S.flags['ch_' + r0.act])) {
       const ch = (D.chapters || []).find((c) => c.id === r0.act);
-      if (ch) {
+      if (ch && (S.night || 1) >= (ch.at || 1)) {
+        S.act = r0.act;
+        S.flags['ch_' + r0.act] = true;
         emit('divider', '· · · · · · · · · ·');
         emit('book', ch.title);
         (ch.quote || []).forEach((q) => emit('say', q));
@@ -286,19 +348,9 @@ window.Game = (function () {
   function playerDies() {
     S.combat = null;
     S.hp = 0;
-    tick(2);
-    emit('divider', '· · · · · · · · · ·');
-    emit('bad', '你眼前一黑，什么都不知道了。');
-    emit('desc', '再睁眼时，你躺在鸦渡的木桩边上。天没有亮。');
-    emit('desc', '伤口结了痂，怀里那张羊皮纸还在。河对岸，霍洛城仍旧一盏灯都没有。');
-    const lost = Math.floor(S.exp * 0.25);
-    if (lost > 0) { S.exp -= lost; emit('sys', `你丢了 ${lost} 点经验，散在河里，捞不回来。`); }
-    const coinLost = Math.floor(S.money / 2);
-    if (coinLost > 0) { S.money -= coinLost; emit('sys', `身上的银币少了 ${coinLost} 枚。`); }
-    S.hp = Math.max(1, Math.floor(S.hpMax * 0.5));
-    S.mp = Math.floor(S.mpMax * 0.5);
-    S.buff = null;
-    enterRoom(D.start, true);
+    emit('bad', '你的膝盖先落了地，然后是脸。');
+    emit('desc', '街面上的石头是凉的。你听见很远的地方有人在数数。');
+    endNight('death');
   }
 
   function winCombat() {
@@ -427,27 +479,31 @@ window.Game = (function () {
   /* ─────────────── 结局 ─────────────── */
   function bossFall() {
     emit('divider', '· · · · · · · · · ·');
-    emit('desc', '池水静下来。一点极小的红光从水底浮上来，浮到你的手边，不动了。');
-    emit('desc', '是一块石头。拳头大，里面封着一团缓慢流动的暗红。');
+    emit('desc', '她放下梳子，往后靠在池沿上，像是终于能歇一会儿了。');
+    emit('desc', '水底浮上来一样东西，慢慢浮到你手边，停住。');
+    emit('desc', '是一块铜。拳头大，边缘是崩的，像从什么东西上砸下来的一角。');
     addItem('blood_jade', 1);
     S.flags.bossDead = true;
 
     emit('divider', '——');
-    emit('desc', '你站在池边等了很久。等到身上那点热气都散了，才想起来自己该做什么。');
-    emit('desc', '然后你就什么都不记得了。');
+    emit('desc', '你蹲在池边等着。等到身上那点热气都散了，才想起来自己该做什么。');
+    emit('desc', '然后这一小时从你身上退开了，像退潮。');
 
     S.finale = true;
     S.room = 'void';
     S.visited.void = true;
     emit('place', '无光之厅');
     D.rooms.void.desc.forEach((l) => emit('desc', l));
-    emit('hint', '你听见一个很轻的声音，像有人在水底问你：「你要把它怎么样？」');
-    emit('hint', '——封（seal）　吞（consume）　走（depart）');
+    emit('hint', '你听见一个很轻的声音，像有人在水底问你：「这一小时，你打算怎么办？」');
+    emit('hint', '——讲完（tell）　走（leave）');
     if (cluesAll()) {
-      emit('warn', '你忽然想起，你还有一件别的事可以做：把东西还给她。（输入 还）');
+      emit('warn', '四句遗言你已经凑齐了。（输入 讲完 / 带走）');
     }
-    if (hasItem('ring_iron') || S.flags.anselm_pen) {
-      emit('warn', '你摸了摸怀里的东西——也许还有别的路。（输入 戴 / 烧）');
+    if (hasItem('ring_iron') || S.flags.forged) {
+      emit('hint', '（输入 留下：戴着他给的戒指，坐进这一小时里）');
+    }
+    if (S.flags.anselm_pen) {
+      emit('hint', '（输入 烧：你怀里有那支笔）');
     }
   }
 
@@ -492,6 +548,7 @@ window.Game = (function () {
     load:     ['load', '读档', '载入'],
     clear:    ['clear', '清屏'],
     wait:     ['wait', '等', '等待', '歇'],
+    listen:   ['listen', '听钟', '听', '钟', '熬', '过夜', '睡', '睡一觉'],
     flee:     ['flee', 'f', '逃', '逃跑', '跑'],
     look_me:  ['me', '自己'],
   };
@@ -580,9 +637,31 @@ window.Game = (function () {
         emit('good', '盘子底下压着一支折断的笔，还有一小罐圣油。');
       }
     },
+    'morgue|石台': function () {
+      if (!S.flags.ghost_razor) {
+        S.flags.ghost_razor = true;
+        emit('good', '石台边上有一小碟水，和一把刮胡刀。刀是湿的。');
+        emit('desc', '（有人每天早上替他刮一次胡子。刮了三十年。）');
+      }
+    },
+    'tavern|长桌': function () {
+      if (!S.flags.vera_counted) {
+        S.flags.vera_counted = true;
+        emit('good', '六副碗筷。你把它们数了一遍，又数了一遍。');
+        emit('desc', '第六副的叉子掉在地上——那是给还没坐下的人摆的。');
+      }
+    },
+    'graveyard|石碑': function () {
+      if (!S.flags.stele_full) {
+        S.flags.stele_full = true;
+        emit('desc', '底下那行被凿掉的小字，你趴下去，借着草叶缝里的光认出两个字：');
+        emit('desc', '……「一人出城」。');
+      }
+    },
   };
 
   function cmdLook(arg) {
+    tick(1);
     const r = room();
     if (!arg) {
       if (r.needsLight && !hasLight()) {
@@ -825,6 +904,7 @@ window.Game = (function () {
       // 人物自己的钩子
       if (nid === 'boatman' && picked.i >= 2) S.clues.boatman = true;
       if (nid === 'marta' && picked.i >= 3) S.flags.marta_told = true;
+      if (picked.i >= 2) S.flags[nid + '_told'] = true;
 
       // 听人说话，也是长进
       S.exp += 6;
@@ -901,7 +981,7 @@ window.Game = (function () {
     emit('item', `兵器  ${S.weapon ? D.items[S.weapon].name : '空手'}　　护甲  ${S.armor ? D.items[S.armor].name : '无'}`);
     if (S.ring) emit('item', `戒指  ${D.items[S.ring].name}`);
     emit('item', `所在  ${room().name}　　已行 ${S.steps} 步`);
-    emit('sys', `钟记  ${CHIMES[S.chime]}。`);
+    emit('sys', `钟记  ${clockText()}　第 ${S.night} 夜`);
   }
 
   function cmdSkills() {
@@ -920,13 +1000,13 @@ window.Game = (function () {
     const q = [];
     if (!S.visited.gate) q.push(['active', '过河，去霍洛城。']);
     if (S.visited.gate && !S.clues.keeper) q.push(['active', '小堂里的老修士安塞姆，似乎有话要说。']);
-    if (S.clues.keeper && !S.flags.bossDead) q.push(['active', '查清三十年前那一夜，城里发生了什么。']);
+    if (S.clues.keeper && !S.flags.bossDead) q.push(['active', '弄清这一小时里，每个人在等什么。']);
     if (S.clues.boatman) q.push(['done', '老科尔不肯渡的那一条河。']);
     if (S.clues.stele) q.push(['done', '城门上被凿掉的那半只冠冕。']);
     if (S.clues.mural) q.push(['done', '壁画上被凿掉的那张脸。']);
     if (S.clues.keeper) q.push(['done', '老修士守了三十年的东西。']);
     if (!S.flags.bossDead && isLocked('birch', 'north')) q.push(['', '白桦林里的方井锁着，钥匙不知在谁手上。']);
-    if (S.flags.bossDead) q.push(['active', '灰烬之心在你手上。你要把它怎么样？']);
+    if (S.flags.bossDead) q.push(['active', '那一角铜在你手上。你要拿它怎么办？']);
 
     q.forEach(([cls, txt]) => emit('item', (cls === 'done' ? '✓ ' : cls === 'active' ? '▸ ' : '· ') + txt));
 
@@ -951,7 +1031,7 @@ window.Game = (function () {
   function cmdHelp() {
     emit('divider', '指　令');
     emitKV([
-      ['看 / look', '看看四周；看 城徽 / 看 尸犬 可细看某物'],
+      ['看 / look', '看看四周；看 城徽 / 看 壁画 可细看某物'],
       ['走 北 / n', '朝某方向走。方向可用 n s e w u d 或 北南东西上下'],
       ['拿 剑 / take', '拾起地上的东西'],
       ['用 药 / use', '喝下药水；读 信 可展信'],
@@ -960,6 +1040,7 @@ window.Game = (function () {
       ['说话 老人 / talk', '与人对谈。多谈几次，话会不一样'],
       ['买 / 卖 / list', '行商处交易'],
       ['休息 / rest', '只在小堂可行，回满气血法力'],
+      ['听钟 / listen', '把这一夜熬过去，从头再来一夜（记忆与行囊都留着）'],
       ['背包 / 属性 / 技能 / 任务', '查看自身'],
       ['地图 / 存档 / 读档', '地图与存读'],
     ]);
@@ -978,14 +1059,23 @@ window.Game = (function () {
       const m = D.mobs[aliveMobs()[0]];
       emit('desc', pick(m.lines.idle || m.lines.hit));
     } else {
-      const r = room();
       emit('desc', pick([
         '风从远处过来，带着一点江水的腥。',
         '你听见自己的呼吸，很轻。',
         '有什么东西在你身后很远的地方，动了一下，又停了。',
-        '天色没有变化。这里的天好像不会亮。'
+        '天色没有变化。这里的天不会亮。',
+        '街上又碰了一次铃。铃不响。',
       ]));
     }
+  }
+
+  /* 主动把这一夜熬过去 */
+  function cmdListen() {
+    if (S.combat) { emit('sys', '这时候静不下来听。'); return; }
+    emit('desc', '你抬起头，听。');
+    emit('desc', '钟楼在很远的地方，一下，一下。你数着，数到第十二下，停住。');
+    emit('desc', '然后你想：反正还有一整夜。');
+    endNight('rest');
   }
 
   /* ─────────────── 地图 ─────────────── */
@@ -1161,7 +1251,7 @@ window.Game = (function () {
   function tryFlee() {
     const c = S.combat;
     const m = D.mobs[c.mobId];
-    if (m.boss) { emit('bad', '她的头发缠住了你的脚踝。你走不了。'); return; }
+    if (m.boss) { emit('bad', '她的头发缠住了你的脚踝。这一小时没打算放你走。'); return; }
     const p = 0.4 + S.def * 0.02;
     if (chance(p)) {
       S.combat = null;
@@ -1189,34 +1279,38 @@ window.Game = (function () {
       }
       return false;
     };
-    if (is('封', '封印', '封住', '封了', 'seal')) return doEnding('dawn');
-    if (is('吞', '吞下', '吞了', 'consume', 'swallow')) return doEnding('usurp');
-    if (is('走', '离开', '走了', 'depart', 'leave', 'walk')) return doEnding('leave');
-    if (is('戴', '戴上', '加冕', 'crown', 'wear')) {
-      if (!S.flags.bossDead) return doEnding('crown');
+    if (is('讲完', '过完', '说完', '讲', 'tell', 'finish')) {
+      if (cluesAll()) return doEnding('dawn');
+      emit('sys', '你想把这一小时说完，可你还有话没听全。喉咙里空着一块。');
+      return;
+    }
+    if (is('带走', '带一个人', '带上一个人', '带他走', 'bring', 'truth')) {
+      if (cluesAll()) return doEnding('truth');
+      emit('sys', '你想带走一个人，可你连他们各自在等什么都不知道。');
+      return;
+    }
+    if (is('敲钟', '敲', '接替', '当钟', 'bell', 'ring')) return doEnding('usurp');
+    if (is('走', '离开', '走了', 'leave', 'depart', 'walk')) return doEnding('leave');
+    if (is('留下', '留下来', '坐下', 'stay', 'sit')) {
       if (!hasItem('ring_iron') && !S.flags.forged) {
-        emit('sys', '你想戴上它，可你手上什么都没有。骨冠在等一只手。');
+        emit('sys', '你想坐下来，可你手上空空的——没有谁给过你留下的理由。');
         return;
       }
       return doEnding('crown');
     }
-    if (is('烧', '焚', '殉', 'burn', 'martyr')) {
+    if (is('烧', '焚', '点火', 'burn', 'fire')) {
       if (!S.flags.anselm_pen) {
-        emit('sys', '你想烧掉自己，可你还没有那样东西——一支折断的笔，或者一句能撑住你的话。');
+        emit('sys', '你想烧掉这一天。可你手里没有火种，也没有那支笔。');
         return;
       }
       return doEnding('martyr');
     }
-    if (is('还', '还给她', '还回去', 'return', 'truth')) {
-      if (cluesAll()) return doEnding('truth');
-      emit('sys', '你想说点什么，却发现自己知道的太少。话卡在喉咙里。');
-      return;
-    }
     if (is('看', 'look')) {
-      emit('desc', '什么都没有。只有那点光，和两颗心跳。');
+      emit('desc', '什么都没有。只有那点光，和两个心跳——一个你的，一个慢半拍的。');
       return;
     }
-    emit('sys', '你张了张嘴。──封 / 吞 / 走' + (S.flags.bossDead ? ' / 戴 / 烧' : '') + (cluesAll() ? ' / 还' : ''));  }
+    emit('sys', '你张了张嘴。──讲完 / 走' + (S.flags.bossDead ? ' / 留下 / 烧' : '') + (cluesAll() ? ' / 带走' : ''));
+  }
 
   /* ─────────────── 存档 ─────────────── */
   function snapshot() {
@@ -1307,9 +1401,9 @@ window.Game = (function () {
         if (!mid) { emit('sys', '这里没有可打的东西。'); break; }
         if (D.mobs[mid].boss && !S.flags.bossBegun) {
           S.flags.bossBegun = true;
-          emit('desc', '你握住剑柄。她停止梳头，慢慢地站了起来。');
-          emit('say', '「三十年了。」她说，「你是第一个敢把手放在剑上的人。」');
-          emit('say', '「那就看看，你比他们多能撑几下。」');
+          emit('desc', '你握住剑柄。她放下梳子，慢慢地站了起来。');
+          emit('say', '「你回来了。」她说，「我梳了三十年，就等一个人来把这句说完。」');
+          emit('say', '「那就看看，这一小时你打算怎么过。」');
         }
         tick(1);
         startCombat(mid);
@@ -1325,6 +1419,7 @@ window.Game = (function () {
       case 'save': save(); break;
       case 'load': load(); break;
       case 'wait': cmdWait(); break;
+      case 'listen': cmdListen(); break;
       case 'flee': emit('sys', '你不在战斗里。'); break;
       case 'look_me': cmdStatus(); break;
       case 'clear': out = []; break;
@@ -1350,7 +1445,7 @@ window.Game = (function () {
     S.flags['ch_act1'] = true;
 
     enterRoom(D.start, true);
-    emit('hint', '（输入 help 看指令；先「看」，再「说话 老科尔」。）');
+    emit('hint', '（输入 help 看指令；先「看」，再「说话 吉德」。钟摆在十一点，别急着走。）');
     return { events: out, state: S };
   }
 
@@ -1367,6 +1462,7 @@ window.Game = (function () {
     resumeFrom: resumeFrom,
     exec: exec,
     isLocked: isLocked,
+    clockText: clockText,
     get: function () { return S; },
     serialize: serialize,
     mapModel: mapModel,

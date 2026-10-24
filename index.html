@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>灰烬王冠 · 拾灰人纪事</title>
-<meta name="description" content="一个西幻黑暗哥特风格的文字 MUD：鸦渡、霍洛城、钟底大厅。纯前端、零依赖，双击即玩。">
+<title>十三响 · 霍洛城的一小时</title>
+<meta name="description" content="一个西幻黑暗哥特风格的文字 MUD：钟停在十一点，城里的人每晚重复最后一件事。纯前端、零依赖，双击即玩。">
 <meta name="theme-color" content="#0a0806">
 <meta property="og:type" content="website">
-<meta property="og:title" content="灰烬王冠 · 拾灰人纪事">
-<meta property="og:description" content="一个西幻黑暗哥特风格的文字 MUD。三十年前，钟楼敲到第十三响，霍洛城再没有声音。">
+<meta property="og:title" content="十三响 · 霍洛城的一小时">
+<meta property="og:description" content="三十年前的七月十九日，霍洛城的钟敲到第十三响。你回来了，而这一小时还没过完。">
 <meta property="og:image" content="screenshots/play.jpg">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.png" sizes="64x64" type="image/png">
@@ -28,14 +28,14 @@
     <div class="brand">
       <span class="brand-mark">灰</span>
       <span class="brand-text">
-        <b>灰 烬 王 冠</b>
-        <i>拾灰人纪事 · 卷一</i>
+        <b>十 三 响</b>
+        <i>霍洛城的一小时</i>
       </span>
     </div>
 
     <div class="topbar-mid" id="topMid">
-      <span class="chip" id="chipChime">第十二响</span>
-      <span class="chip" id="chipRoom">鸦渡</span>
+      <span class="chip" id="chipChime">22:00　第1夜</span>
+      <span class="chip" id="chipRoom">灰门口</span>
     </div>
 
     <div class="topbar-tools">
@@ -128,23 +128,23 @@
 <!-- 开场幕布 -->
 <div id="curtain">
   <div class="curtain-inner">
-    <h1>灰烬王冠</h1>
-    <p class="sub">拾灰人纪事 · 卷一</p>
+    <h1>十三响</h1>
+    <p class="sub">霍洛城的一小时</p>
     <hr>
     <p class="flavor">
-      三十年前，钟楼敲到第十三响，霍洛城就再没有声音。<br>
+      三十年前的七月十九日，霍洛城的钟敲到第十三响。<br>
       教廷把它记作疫病，卷宗上只留了一行字：<br>
-      <b>「无生者。」</b>
+      <b>「无生还者。」</b>
     </p>
     <p class="flavor dim">
-      如今有人给你一封没有署名的信，和半枚银币。<br>
-      要你去那座城，把一件东西带回来。
+      钟一天只该敲十二下。第十三下，是多的那一下。<br>
+      而那一小时，到现在还没过完。
     </p>
     <div class="curtain-btns">
       <button id="btnStart" class="big-btn">推 开 城 门</button>
       <button id="btnResume" class="big-btn ghost" hidden>续 上 次</button>
     </div>
-    <p class="tip">建议全屏 · 支持方向键翻查历史命令</p>
+    <p class="tip">建议全屏 · 方向键翻查历史 · 输入 listen 熬过一夜</p>
   </div>
 </div>
 

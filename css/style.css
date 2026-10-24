@@ -521,7 +521,7 @@ kbd, .kw{
 }
 #veil.show{ display:grid; }
 @keyframes veilIn{ from{opacity:0} to{opacity:1} }
-#veil .veil-inner{ max-width:600px; width:100%; padding:8vh 0; }
+#veil .veil-inner{ max-width:640px; width:100%; padding:5vh 0; }
 #veil h2{
   font-size:clamp(26px,5vw,42px); font-weight:400; letter-spacing:.36em; text-indent:.36em;
   color:#e8c0a0; margin-bottom:10px;
