@@ -10,6 +10,10 @@
 ![Deps](https://img.shields.io/badge/dependencies-0-8c7a5e)
 ![License](https://img.shields.io/badge/license-MIT-9a8a70)
 
+<p align="center">
+  <img src="screenshots/title.jpg" alt="十三响 · 开场" width="840">
+</p>
+
 ---
 
 ## 玩什么
@@ -19,6 +23,12 @@
 你是那个被抱出去的孩子——裹在羊毛里，从灰门底下推出去。今年你三十岁，回来了。
 
 你不是来查真相的。你是来把这一小时**过完**的。
+
+<p align="center">
+  <img src="screenshots/play.jpg" alt="游戏中：圣阿黛拉小堂，老修士安塞姆" width="840">
+</p>
+
+<p align="center"><sub>老修士在同一页上写了三十年，纸结成一块板——「可是笔一落下，写出来的总是这一句。」</sub></p>
 
 ### 循环怎么转
 
@@ -61,6 +71,12 @@
 - **6 个结局**，其中三个需要你先解开线索才说得出口
 - 存档走 `localStorage`，关掉浏览器也在
 
+<p align="center">
+  <img src="screenshots/ending.jpg" alt="结局：走出" width="840">
+</p>
+
+<p align="center"><sub>「你带走了一整夜，把它还成了白天。」——六个结局之一</sub></p>
+
 ## 文件
 
 ```
@@ -78,7 +94,7 @@
     └── main.js         渲染、按键、存档、结局层
 ```
 
-约 3600 行，没有框架，没有 npm，没有构建步骤。
+约 3500 行，没有框架，没有 npm，没有构建步骤。
 
 ## 技术笔记
 
