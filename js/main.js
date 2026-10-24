@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
    灰烬王冠 · 界面层
    把引擎事件渲染成 CRT 终端上的字；把按键翻译成命令。
    ═══════════════════════════════════════════════════════════ */
@@ -26,6 +26,7 @@
     place: 'place', desc: 'desc', say: 'say', npc: 'npc',
     sys: 'sys', hint: 'hint', good: 'good', bad: 'bad', warn: 'warn',
     item: 'item', combat: 'combat', divider: 'divider', ascii: 'ascii', tag: 'tag',
+    book: 'book',
   };
 
   function appendEvent(ev) {
@@ -165,14 +166,27 @@
   function renderQuest(S) {
     const q = [];
     if (!S.visited.gate) q.push(['active', '过河，去霍洛城']);
+    else if (!S.clues.keeper) q.push(['active', '小堂里的老修士']);
     else if (!S.flags.bossDead) q.push(['active', '查清那一夜的事']);
     if (S.flags.bossDead) q.push(['active', '灰烬之心在你手上']);
-    if (S.clues.stele)  q.push(['done', '城徽上敲掉的四个字']);
-    if (S.clues.mural)  q.push(['done', '壁画上凿掉的那张脸']);
-    if (S.clues.keeper) q.push(['done', '老修士守的东西']);
     if (S.clues.boatman) q.push(['done', '老科尔不肯渡的河']);
-    if (!q.length) q.push(['', '暂时无事']);
-    $('#questList').innerHTML = q.map(([c, t]) =>
+    if (S.clues.stele) q.push(['done', '城门上敲掉的冠']);
+    if (S.clues.mural) q.push(['done', '壁画上凿掉的脸']);
+    if (S.clues.keeper) q.push(['done', '老修士守的东西']);
+
+    // 支线挑两条未完成的
+    const side = ((window.DATA && window.DATA.quests) || [])
+      .filter((x) => !x.steps.every((s) => s.done(S)))
+      .slice(0, 2);
+    side.forEach((x) => q.push(['side', x.title]));
+
+    // 已完成的主线压成一行，别把面板撑爆
+    const doneN = q.filter((x) => x[0] === 'done').length;
+    const shown = q.filter((x) => x[0] !== 'done');
+    if (doneN) shown.push(['done', '已解开 ' + doneN + ' 桩']);
+
+    if (!shown.length) shown.push(['', '暂时无事']);
+    $('#questList').innerHTML = shown.map(([c, t]) =>
       '<li class="' + c + '">' + esc(t) + '</li>').join('');
   }
 

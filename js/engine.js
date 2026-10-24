@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
    灰烬王冠 · 引擎
    命令解析 / 移动 / 战斗 / 背包 / 剧情 / 结局
    引擎不触碰 DOM：产出 {t, m} 事件序列，交给 UI 渲染。
@@ -54,10 +54,14 @@ window.Game = (function () {
       bag: { letter: 1, coin_half: 1, peach_sword: 1, cloth: 1 },
       weapon: 'peach_sword',
       armor: 'cloth',
+      ring: null,
       learned: ['rock', 'breath', 'step'],
       flags: {},
       clues: {},
       talkIdx: {},
+      talkDone: {},
+      act: 'act1',
+      dot: null,
       visited: {},
       taken: {},
       cleared: {},
@@ -164,9 +168,34 @@ window.Game = (function () {
     S.room = id;
     S.visited[id] = true;
     if (!silent) tick(1);
+
+    const r0 = D.rooms[id];
+    // 卷目：进入新的一卷时，先合上书页
+    if (r0 && r0.act && r0.act !== S.act && !(S.flags && S.flags['ch_' + r0.act])) {
+      S.act = r0.act;
+      S.flags['ch_' + r0.act] = true;
+      const ch = (D.chapters || []).find((c) => c.id === r0.act);
+      if (ch) {
+        emit('divider', '· · · · · · · · · ·');
+        emit('book', ch.title);
+        (ch.quote || []).forEach((q) => emit('say', q));
+        emit('divider', '· · · · · · · · · ·');
+      }
+    }
+
     describeRoom(true);
 
     const r = D.rooms[id];
+    // 有些地方会自己长出新的东西来
+    if (r && r.respawn) {
+      S.clearedAt = S.clearedAt || {};
+      const t = S.clearedAt[id];
+      if (!t) S.clearedAt[id] = S.steps;
+      else if (S.steps - t > 4) {
+        S.cleared[id] = {};
+        S.clearedAt[id] = S.steps;
+      }
+    }
     if (r && r.mobs) {
       const alive = aliveMobs();
       alive.forEach((mid) => {
@@ -279,19 +308,25 @@ window.Game = (function () {
     S.cleared[roomId] = S.cleared[roomId] || {};
     S.cleared[roomId][c.mobId] = true;
     delete S.mobState[roomId + '|' + c.mobId];
+    S.clearedAt = S.clearedAt || {};
+    S.clearedAt[roomId] = S.steps;
     S.combat = null;
     S.buff = null;
     S.kills++;
 
     emit('good', '—— 你赢了。');
-    m.lines.die.forEach((l) => emit('desc', l));
+    (m.lines.die || ['它不动了，像一件被放下的东西。']).forEach((l) => emit('desc', l));
 
     const gained = Math.round(m.exp * rnd(0.9, 1.1));
     S.exp += gained;
     emit('sys', `经验 +${gained}`);
     if (m.money) { S.money += m.money; emit('sys', `银币 +${m.money}`); }
 
-    (m.drops || []).forEach((d) => {
+    const drops = (m.drops || []).slice();
+    if (m.drop && !Array.isArray(m.drop)) {
+      Object.keys(m.drop).forEach((id) => drops.push({ id: id, chance: m.drop[id] }));
+    }
+    drops.forEach((d) => {
       if (chance(d.chance == null ? 1 : d.chance)) addItem(d.id, d.n || 1);
     });
 
@@ -321,6 +356,15 @@ window.Game = (function () {
     if (!c) return;
     const m = D.mobs[c.mobId];
 
+    // 旧伤：每回合先流一点血
+    if (S.dot) {
+      S.hp -= S.dot.v;
+      emit('combat', `${S.dot.name}又咬了一口，气血 -${S.dot.v}。`, 'me');
+      S.dot.turns--;
+      if (S.dot.turns <= 0) S.dot = null;
+      if (S.hp <= 0) return playerDies();
+    }
+
     let dodgeChance = 0.05 + (S.buff ? S.buff.dodge : 0);
     if (chance(dodgeChance)) {
       emit('combat', `${m.name}扑过来，你侧身让开，衣角带着风。`);
@@ -330,6 +374,12 @@ window.Game = (function () {
       if (chance(0.35)) emit('desc', pick(m.lines.hurt));
       emit('combat', `${m.name} 击中你，气血 -${r.v}${r.crit ? '（重击）' : ''}。`);
       if (S.hp <= 0) return playerDies();
+
+      // 某些东西咬上就不松口
+      if (m.venom && !S.dot && chance(0.35)) {
+        S.dot = { name: m.venom.name, v: m.venom.v, turns: m.venom.turns };
+        emit('bad', m.venom.text);
+      }
     }
 
     if (S.buff) {
@@ -395,6 +445,9 @@ window.Game = (function () {
     emit('hint', '——封（seal）　吞（consume）　走（depart）');
     if (cluesAll()) {
       emit('warn', '你忽然想起，你还有一件别的事可以做：把东西还给她。（输入 还）');
+    }
+    if (hasItem('ring_iron') || S.flags.anselm_pen) {
+      emit('warn', '你摸了摸怀里的东西——也许还有别的路。（输入 戴 / 烧）');
     }
   }
 
@@ -489,6 +542,46 @@ window.Game = (function () {
 
   /* ─────────────── 具体命令 ─────────────── */
 
+  /* 细看某些东西，会看出事来 */
+  const LOOK_HOOKS = {
+    'gate|城徽': function () {
+      if (!S.clues.stele) { S.clues.stele = true; emit('good', '（你记住了那半只冠冕的样子。）'); }
+    },
+    'reliquary|壁画': function () {
+      if (!S.clues.mural) { S.clues.mural = true; emit('good', '（那张被凿掉的脸，你记住了。）'); }
+    },
+    'morgue|白布': function () {
+      S.flags.morgue_looked = true;
+    },
+    'morgue|木柜': function () {
+      if (!S.flags.morgue_key) {
+        S.flags.morgue_key = true;
+        addItem('brass_key', 1);
+        emit('good', '柜底压着一把铁钥匙，钥匙柄上铸着一棵桦树。');
+      }
+    },
+    'graveyard|野花': function () {
+      if (!S.flags.smithery_hammer) {
+        S.flags.smithery_hammer = true;
+        addItem('whetstone', 1);
+        emit('good', '花底下压着一把铁锤和一块磨刀石。铁匠的东西。');
+      }
+    },
+    'tavern|酒杯': function () {
+      if (!S.flags.vera_cup) {
+        S.flags.vera_cup = true;
+        emit('good', '你把杯子翻过来——杯底刻着一个名字：「奥斯温」。');
+      }
+    },
+    'shrine|供桌': function () {
+      if (!S.flags.anselm_pen) {
+        S.flags.anselm_pen = true;
+        addItem('oil', 1);
+        emit('good', '盘子底下压着一支折断的笔，还有一小罐圣油。');
+      }
+    },
+  };
+
   function cmdLook(arg) {
     const r = room();
     if (!arg) {
@@ -505,8 +598,8 @@ window.Game = (function () {
       for (const k in r.scenery) {
         if (k.indexOf(arg) >= 0 || arg.indexOf(k) >= 0) {
           emit('desc', r.scenery[k]);
-          if (k === '石碑' && S.room === 'gate') S.clues.stele = true;
-          if (k === '壁画' && S.room === 'hall') S.clues.mural = true;
+          const hook = LOOK_HOOKS[S.room + '|' + k];
+          if (hook) hook();
           return;
         }
       }
@@ -599,8 +692,10 @@ window.Game = (function () {
       let note = '';
       if (S.weapon === id) note = '（兵器 · 已装备）';
       else if (S.armor === id) note = '（护甲 · 已装备）';
+      else if (S.ring === id) note = '（戒指 · 已装备）';
       else if (it.kind === 'weapon') note = `（兵器 · 攻 +${it.atk}）`;
       else if (it.kind === 'armor') note = `（护甲 · 防 +${it.def}）`;
+      else if (it.kind === 'ring') note = '（戒指）';
       else if (it.kind === 'heal') note = `（回气血 ${it.hp}）`;
       else if (it.kind === 'mana') note = `（回法力 ${it.mp}）`;
       else if (it.kind === 'charm') note = '（辟邪）';
@@ -620,6 +715,9 @@ window.Game = (function () {
     } else if (it.kind === 'armor') {
       S.armor = id;
       emit('good', `你穿上了${it.name}。防 +${it.def}。`);
+    } else if (it.kind === 'ring') {
+      S.ring = id;
+      emit('good', `你戴上了${it.name}。`);
     } else {
       emit('sys', '这东西不能装备。');
       return;
@@ -685,39 +783,63 @@ window.Game = (function () {
     const npc = D.npcs[nid];
     emit('npc', npc.desc);
 
-    const idx = S.talkIdx[nid] || 0;
-    const lines = npc.lines();
+    S.talkDone[nid] = S.talkDone[nid] || {};
+    const done = S.talkDone[nid];
+    let picked = null;
 
-    if (idx < lines.length) {
-      emit('say', lines[idx]);
-      S.talkIdx[nid] = idx + 1;
-    } else {
-      emit('say', '「……」' + npc.name + '不再说话了。');
+    for (let i = 0; i < (npc.talks || []).length; i++) {
+      if (done[i]) continue;
+      const t = npc.talks[i];
+      if (t.when && !t.when(S)) continue;
+      picked = { i: i, t: t };
+      break;
     }
-    tick(1);
 
-    // 剧情钩子
-    if (nid === 'boatman' && S.talkIdx.boatman >= 3) S.clues.boatman = true;
+    if (picked) {
+      done[picked.i] = true;
+      picked.t.lines.forEach((l) => emit('say', l));
 
-    if (nid === 'keeper' && S.talkIdx.keeper >= 3) {
-      S.clues.keeper = true;
-      if (S.learned.indexOf('lantern') < 0) {
-        S.learned.push('lantern');
-        emit('divider', '——');
-        emit('say', '「你过来。」老修士招手，在你眉心点了三下。');
-        emit('say', '「心里那点火，别让它灭了。灭了，就跟我一样，只剩一捧水。」');
-        emit('good', '习得：圣光。');
+      if (npc.shop) S.flags.shopOpen = true;
+
+      if (picked.t.learn && S.learned.indexOf(picked.t.learn) < 0) {
+        S.learned.push(picked.t.learn);
+        emit('good', `习得：${D.skills[picked.t.learn].name}。`);
       }
-      if (!S.flags.restHint) {
+      if (picked.t.clue) S.clues[picked.t.clue] = true;
+
+      if (picked.t.restHint && !S.flags.restHint) {
         S.flags.restHint = true;
         emit('hint', '（在这小堂里可以 rest 休息，回满气血与法力。）');
       }
-    }
+      if (picked.t.open && !S.flags.shopHint) {
+        S.flags.shopHint = true;
+        emit('hint', '（buy 物品 可买，sell 物品 可卖。用 list 看货。）');
+      }
+      if (picked.t.reward === 'forge') {
+        S.flags.forged = true;
+        S.atk += 2;
+        if (S.weapon && D.items[S.weapon]) D.items[S.weapon].atk = (D.items[S.weapon].atk || 0) + 1;
+        emit('good', '—— 兵器加了一层，攻 +2。');
+      }
 
-    if (nid === 'peddler') {
-      emit('hint', '（buy 物品 可买，sell 物品 可卖。用 list 看货。）');
-      S.flags.shopOpen = true;
+      // 人物自己的钩子
+      if (nid === 'boatman' && picked.i >= 2) S.clues.boatman = true;
+      if (nid === 'marta' && picked.i >= 3) S.flags.marta_told = true;
+
+      // 听人说话，也是长进
+      S.exp += 6;
+      checkLevel();
+    } else {
+      const rep = npc.repeat || ['「……」' + npc.name + '不再说话了。'];
+      const k = S.talkIdx[nid] || 0;
+      emit('say', rep[k % rep.length]);
+      S.talkIdx[nid] = k + 1;
+      if (npc.shop) {
+        S.flags.shopOpen = true;
+        emit('hint', '（buy 物品 可买，sell 物品 可卖。用 list 看货。）');
+      }
     }
+    tick(1);
   }
 
   function cmdShopList() {
@@ -747,7 +869,7 @@ window.Game = (function () {
     if (!id) { emit('sys', '你身上没有「' + arg + '」。'); return; }
     const it = D.items[id];
     if (it.noDrop) { emit('sys', '他不收这个。'); return; }
-    const price = Math.max(1, Math.floor((it.value || 0) / 2));
+    const price = Math.max(1, Math.floor((it.price || it.value || 2) / 2));
     if (S.weapon === id) S.weapon = null;
     if (S.armor === id) S.armor = null;
     delItem(id, 1);
@@ -777,6 +899,7 @@ window.Game = (function () {
     emit('item', `攻击  ${totalAtk()}（基 ${S.atk}${weaponAtk() ? ' + 兵器 ' + weaponAtk() : ''}）`);
     emit('item', `防御  ${totalDef()}（基 ${S.def}${armorDef() ? ' + 护甲 ' + armorDef() : ''}）`);
     emit('item', `兵器  ${S.weapon ? D.items[S.weapon].name : '空手'}　　护甲  ${S.armor ? D.items[S.armor].name : '无'}`);
+    if (S.ring) emit('item', `戒指  ${D.items[S.ring].name}`);
     emit('item', `所在  ${room().name}　　已行 ${S.steps} 步`);
     emit('sys', `钟记  ${CHIMES[S.chime]}。`);
   }
@@ -792,18 +915,37 @@ window.Game = (function () {
 
   function cmdQuest() {
     emit('divider', '心　事');
+
+    /* 主线 */
     const q = [];
     if (!S.visited.gate) q.push(['active', '过河，去霍洛城。']);
-    if (S.visited.gate && !S.flags.bossDead) q.push(['active', '查清三十年前那一夜，城里发生了什么。']);
-    if (!S.learned.includes('lantern')) q.push(['', '小堂里的老修士安塞姆，似乎有话要说。']);
-    if (!S.flags.bossDead && isLocked('bamboo', 'north')) q.push(['', '白桦林里的方井锁着，钥匙不知在谁手上。']);
-    if (S.clues.stele) q.push(['done', '城徽背面被抠掉的四个字。']);
+    if (S.visited.gate && !S.clues.keeper) q.push(['active', '小堂里的老修士安塞姆，似乎有话要说。']);
+    if (S.clues.keeper && !S.flags.bossDead) q.push(['active', '查清三十年前那一夜，城里发生了什么。']);
+    if (S.clues.boatman) q.push(['done', '老科尔不肯渡的那一条河。']);
+    if (S.clues.stele) q.push(['done', '城门上被凿掉的那半只冠冕。']);
     if (S.clues.mural) q.push(['done', '壁画上被凿掉的那张脸。']);
     if (S.clues.keeper) q.push(['done', '老修士守了三十年的东西。']);
-    if (S.clues.boatman) q.push(['done', '老科尔不肯渡的那一条河。']);
+    if (!S.flags.bossDead && isLocked('birch', 'north')) q.push(['', '白桦林里的方井锁着，钥匙不知在谁手上。']);
     if (S.flags.bossDead) q.push(['active', '灰烬之心在你手上。你要把它怎么样？']);
-    if (!q.length) q.push(['', '暂时没有要办的事。']);
+
     q.forEach(([cls, txt]) => emit('item', (cls === 'done' ? '✓ ' : cls === 'active' ? '▸ ' : '· ') + txt));
+
+    /* 支线 */
+    const side = (D.quests || []).filter((x) => !x.steps[x.steps.length - 1].done(S) || !x.done);
+    if (side.length) {
+      emit('divider', '别　的　事');
+      side.forEach((x) => {
+        const all = x.steps.every((s) => s.done(S));
+        emit('item', (all ? '✓ ' : '· ') + x.title);
+        if (!all) {
+          x.steps.forEach((s) => {
+            emit('desc', (s.done(S) ? '　✓ ' : '　· ') + s.text);
+          });
+        }
+      });
+    }
+
+    if (!q.length) emit('item', '暂时没有要办的事。');
   }
 
   function cmdHelp() {
@@ -813,8 +955,8 @@ window.Game = (function () {
       ['走 北 / n', '朝某方向走。方向可用 n s e w u d 或 北南东西上下'],
       ['拿 剑 / take', '拾起地上的东西'],
       ['用 药 / use', '喝下药水；读 信 可展信'],
-      ['装备 剑 / 穿 袍', '换兵器与护甲'],
-      ['打 尸犬 / attack', '动手。战起后：a 普攻、1-5 出招、f 逃'],
+      ['装备 剑 / 穿 袍', '换兵器、护甲与戒指'],
+      ['打 尸犬 / attack', '动手。战起后：a 普攻、1-9 出招、f 逃'],
       ['说话 老人 / talk', '与人对谈。多谈几次，话会不一样'],
       ['买 / 卖 / list', '行商处交易'],
       ['休息 / rest', '只在小堂可行，回满气血法力'],
@@ -834,7 +976,7 @@ window.Game = (function () {
     emit('sys', '你站了一会儿。');
     if (room().mobs && aliveMobs().length) {
       const m = D.mobs[aliveMobs()[0]];
-      emit('desc', m.lines.idle[0]);
+      emit('desc', pick(m.lines.idle || m.lines.hit));
     } else {
       const r = room();
       emit('desc', pick([
@@ -983,6 +1125,25 @@ window.Game = (function () {
       if (S.combat) emitCombatFrame();
       return;
     }
+    if (sk.type === 'heal') {
+      if (S.hp >= S.hpMax) { emit('sys', '你气血充盈，不必浪费法力。'); return; }
+      S.hp = Math.min(S.hpMax, S.hp + sk.healHp);
+      emit('combat', sk.verb + '，血止住了。');
+      emit('sys', `气血 ${S.hp}/${S.hpMax}。`);
+      tick(1);
+      enemyTurn();
+      if (S.combat) emitCombatFrame();
+      return;
+    }
+    if (sk.type === 'cure') {
+      if (!S.dot) { emit('sys', '血里没有脏东西。'); return; }
+      S.dot = null;
+      emit('combat', sk.verb + '，那股冷意退了。');
+      tick(1);
+      enemyTurn();
+      if (S.combat) emitCombatFrame();
+      return;
+    }
     if (sk.type === 'buff') {
       S.buff = { dodge: sk.buff.dodge, turns: sk.buff.turns + 1 };
       emit('combat', sk.verb + '。');
@@ -1031,6 +1192,21 @@ window.Game = (function () {
     if (is('封', '封印', '封住', '封了', 'seal')) return doEnding('dawn');
     if (is('吞', '吞下', '吞了', 'consume', 'swallow')) return doEnding('usurp');
     if (is('走', '离开', '走了', 'depart', 'leave', 'walk')) return doEnding('leave');
+    if (is('戴', '戴上', '加冕', 'crown', 'wear')) {
+      if (!S.flags.bossDead) return doEnding('crown');
+      if (!hasItem('ring_iron') && !S.flags.forged) {
+        emit('sys', '你想戴上它，可你手上什么都没有。骨冠在等一只手。');
+        return;
+      }
+      return doEnding('crown');
+    }
+    if (is('烧', '焚', '殉', 'burn', 'martyr')) {
+      if (!S.flags.anselm_pen) {
+        emit('sys', '你想烧掉自己，可你还没有那样东西——一支折断的笔，或者一句能撑住你的话。');
+        return;
+      }
+      return doEnding('martyr');
+    }
     if (is('还', '还给她', '还回去', 'return', 'truth')) {
       if (cluesAll()) return doEnding('truth');
       emit('sys', '你想说点什么，却发现自己知道的太少。话卡在喉咙里。');
@@ -1040,7 +1216,7 @@ window.Game = (function () {
       emit('desc', '什么都没有。只有那点光，和两颗心跳。');
       return;
     }
-    emit('sys', '你张了张嘴。──封 / 吞 / 走' + (cluesAll() ? ' / 还' : ''));  }
+    emit('sys', '你张了张嘴。──封 / 吞 / 走' + (S.flags.bossDead ? ' / 戴 / 烧' : '') + (cluesAll() ? ' / 还' : ''));  }
 
   /* ─────────────── 存档 ─────────────── */
   function snapshot() {
@@ -1165,7 +1341,14 @@ window.Game = (function () {
     S = newState(name);
     out = [];
     D.intro.forEach((l) => emit('desc', l));
-    emit('divider', '— 卷 一 · 鸦 渡 —');
+
+    const ch = (D.chapters || [])[0];
+    emit('divider', '· · · · · · · · · ·');
+    emit('book', ch ? ch.title : '卷 一');
+    if (ch) (ch.quote || []).forEach((q) => emit('say', q));
+    emit('divider', '· · · · · · · · · ·');
+    S.flags['ch_act1'] = true;
+
     enterRoom(D.start, true);
     emit('hint', '（输入 help 看指令；先「看」，再「说话 老科尔」。）');
     return { events: out, state: S };

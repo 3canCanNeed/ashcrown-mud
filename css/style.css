@@ -236,6 +236,18 @@ body{
   margin:1.3em 0 .9em; user-select:none;
 }
 
+/* 卷目：翻开新的一页 */
+.line.book{
+  margin:1.5em 0 1.1em; text-align:center;
+  font-size:19px; letter-spacing:.42em; text-indent:.42em;
+  color:var(--accent); font-weight:400;
+  text-shadow:0 0 26px var(--glow);
+}
+.line.book::after{
+  content:""; display:block; width:64px; height:1px; margin:14px auto 0;
+  background:linear-gradient(90deg, transparent, var(--panel-brd), transparent);
+}
+
 /* 战斗块 */
 .line.combat{ color:var(--fg); font-variant-numeric:tabular-nums; }
 .line.combat.foe{ color:#d98d7f; }
@@ -339,14 +351,15 @@ kbd, .kw{
 #side::-webkit-scrollbar-thumb{ background:var(--faint); border-radius:6px; }
 
 .panel{
+  flex:0 0 auto;
   border:1px solid var(--panel-brd); border-radius:var(--radius);
-  background:var(--panel); padding:10px 12px 11px;
+  background:var(--panel); padding:8px 11px 9px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.02);
 }
 .panel-head{
   display:flex; align-items:center; justify-content:space-between;
   font-size:10.5px; letter-spacing:.24em; color:var(--faint);
-  padding-bottom:7px; margin-bottom:8px;
+  padding-bottom:5px; margin-bottom:6px;
   border-bottom:1px dashed rgba(214,164,96,.14);
 }
 .panel-head em{ font-style:normal; letter-spacing:.1em; color:var(--dim); }
@@ -387,6 +400,8 @@ kbd, .kw{
 .gear-row span.empty{ color:var(--faint); }
 
 .bag-list, .quest-list{ list-style:none; display:flex; flex-direction:column; gap:3px; }
+.bag-list{ max-height:76px; overflow-y:auto; padding-right:4px; scrollbar-width:thin; scrollbar-color:var(--faint) transparent; }
+.quest-list{ max-height:110px; overflow-y:auto; padding-right:4px; scrollbar-width:thin; scrollbar-color:var(--faint) transparent; }
 .bag-list li{
   display:flex; justify-content:space-between; gap:8px;
   font-size:11.5px; color:var(--fg); padding:1px 3px;
@@ -418,6 +433,7 @@ kbd, .kw{
 .mm-cell.mm-void{ border-color:transparent; background:none; }
 .mm-cell.unseen{
   color:var(--faint); border-style:dashed; border-color:rgba(214,164,96,.13);
+  opacity:.42;
 }
 .mm-cell.seen{ color:var(--dim); background:rgba(214,164,96,.055); }
 .mm-cell.here{
@@ -433,6 +449,8 @@ kbd, .kw{
 .quest-list li.done::before{ content:"✓"; color:var(--good); }
 .quest-list li.empty{ color:var(--faint); padding-left:0; }
 .quest-list li.empty::before{ content:""; }
+.quest-list li.side{ color:var(--dim); }
+.quest-list li.side::before{ content:"◇"; color:var(--faint); }
 
 /* 底栏 */
 #statusbar{
